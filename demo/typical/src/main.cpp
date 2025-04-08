@@ -10,7 +10,7 @@ int main() {
 
     while(1) {
         GPIOB->ODR ^= (1 << 0);
-        delay();
+        delay<1000000>();
     }
 }
 

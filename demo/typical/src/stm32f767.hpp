@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 
 // Register addresses
 constexpr uint32_t RCC_BASE = 0x40023800;
@@ -22,7 +23,9 @@ struct GPIO_t {
 #define RCC ((RCC_t*)RCC_BASE)
 #define GPIOB ((GPIO_t*)GPIOB_BASE)
 
-// Simple delay
-void delay() {
-    for(volatile uint32_t i = 0; i < 100000; ++i);
+template<size_t N>
+__attribute__((optimize("O0"))) void delay() {
+    for (volatile uint32_t i = 0; i < N; ++i) {
+        asm volatile("nop");
+    }
 }

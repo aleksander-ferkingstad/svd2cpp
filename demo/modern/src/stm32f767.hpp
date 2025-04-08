@@ -1,28 +1,48 @@
 #pragma once
-
 #include <cstdint>
+#include <cstddef>
+#include <concepts>
+#include <type_traits>
+#include <bit>
 
-// Register addresses
-constexpr uint32_t RCC_BASE = 0x40023800;
-constexpr uint32_t GPIOB_BASE = 0x40020400;
+class Read_only {};
+class Write_only {};
+class Read_write : public Read_only, public Write_only {};
 
-// Register definitions
-struct RCC_t {
-    volatile uint32_t CR, PLLCFGR, CFGR, CIR, AHB1RSTR, AHB2RSTR, AHB3RSTR,
-        RESERVED0, APB1RSTR, APB2RSTR, RESERVED1[2], AHB1ENR, AHB2ENR, AHB3ENR,
-        RESERVED2, APB1ENR, APB2ENR, RESERVED3[2], AHB1LPENR, AHB2LPENR,
-        AHB3LPENR, RESERVED4, APB1LPENR, APB2LPENR;
+template<typename T>
+concept RegisterType = std::same_as<T, uint8_t> || std::same_as<T, uint16_t> || std::same_as<T, uint32_t> || std::same_as<T, uint64_t>;
+
+template<RegisterType Reg_type, typename Access_type = Read_write>
+class Register {
+public:
+constexpr Register(uint32_t address) : raw_ptr(std::bit_cast<volatile Reg_type*>(address)) {}
+
+    void operator=(Reg_type bit_mask) {
+        *raw_ptr = bit_mask;
+    }
+
+    operator Reg_type() const {
+        return *raw_ptr;
+    }
+
+    void operator |= (Reg_type bit_mask) const {
+        *raw_ptr |= bit_mask;
+    }
+
+    void operator &= (Reg_type bit_mask) const {
+        *raw_ptr &= bit_mask;
+    }
+
+    void operator ^= (Reg_type bit_mask) const {
+        *raw_ptr ^= bit_mask;
+    }
+private:
+    volatile Reg_type* raw_ptr;
 };
 
-struct GPIO_t {
-    volatile uint32_t MODER, OTYPER, OSPEEDR, PUPDR, IDR, ODR, BSRR, LCKR, AFR[2];
-};
-
-// Peripheral instances
-#define RCC ((RCC_t*)RCC_BASE)
-#define GPIOB ((GPIO_t*)GPIOB_BASE)
-
-// Simple delay
-void delay() {
-    for(volatile uint32_t i = 0; i < 100000; ++i);
+template<size_t N>
+__attribute__((optimize("O0"))) void delay() {
+    for (volatile uint32_t i = 0; i < N; ++i) {
+        asm volatile("nop");
+    }
 }
