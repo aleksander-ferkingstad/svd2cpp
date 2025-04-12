@@ -6,7 +6,6 @@ Register<uint32_t, AccessType::ReadWrite> gpiob_moder {0x40020400 + 0x00};
 Register<uint32_t, AccessType::ReadWrite> gpiob_odr   {0x40020400 + 0x14};
 
 int main() {
-    
     AHB1ENR |= (1 << 1); // Enable GPIOB clock
     gpiob_moder &= ~(3 << 0); // Clear MODER bits for PB0
     gpiob_moder |= (1 << 0); // Set MODER bits for PB0 to output mode

@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+        
+            "name": "stm32l4xx",
+            "includePath": [
+                "${workspaceFolder}/demo/modern/**"
+            ],
+            "defines": [],
+            "cStandard": "c17",
+            "cppStandard": "c++23",
+            "intelliSenseMode": "gcc-arm",
+            "compilerPath": "/usr/bin/arm-none-eabi-g++"
+        }
+    ],
+    "version": 4
+}
