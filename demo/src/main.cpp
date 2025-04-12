@@ -1,9 +1,9 @@
 #include <register.hpp>
 #include "delay.hpp"
 
-Register<uint32_t, AccessType::ReadWrite> AHB1ENR     {0x40023800 + 0x30};
-Register<uint32_t, AccessType::ReadWrite> gpiob_moder {0x40020400 + 0x00};
-Register<uint32_t, AccessType::ReadWrite> gpiob_odr   {0x40020400 + 0x14};
+constinit Register<uint32_t, 0x40023830, AccessType::ReadWrite> AHB1ENR;
+constinit Register<uint32_t, 0x40020400, AccessType::ReadWrite> gpiob_moder;
+constinit Register<uint32_t, 0x40020414, AccessType::ReadWrite> gpiob_odr;
 
 int main() {
     AHB1ENR |= (1 << 1); // Enable GPIOB clock
@@ -14,6 +14,3 @@ int main() {
         delay<100000>();
     }
 }
-
-
-
