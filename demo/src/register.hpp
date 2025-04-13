@@ -40,7 +40,7 @@ public:
     template<size_t pos>
     class BitProxy {
     public:
-        constexpr void operator=(bool value) const requires(access_type != AccessType::ReadOnly) {
+        constexpr void operator=(bool value) const requires(access_type == AccessType::ReadWrite) {
             constexpr reg_type mask = 1 << pos;
             if (value) { *raw_ptr() |= mask; }
             else { *raw_ptr() &= ~mask; }
@@ -48,6 +48,10 @@ public:
         
         constexpr operator bool() const requires(access_type != AccessType::WriteOnly) {
             return (*raw_ptr() >> pos) & 1;
+        }
+
+        constexpr void toggle() const requires(access_type == AccessType::ReadWrite) {
+            *raw_ptr() ^= (1 << pos);
         }
     };
 

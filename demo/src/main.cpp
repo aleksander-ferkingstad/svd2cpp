@@ -16,7 +16,7 @@ int main() {
     GPIOB.MODER.bits<0,1>() = 0;
     GPIOB.MODER.bit<0>() = 1;
     while(1) {
-        GPIOB.ODR ^= 1;
+        GPIOB.ODR.bit<0>().toggle();
         delay<100000>();
     }
 }
