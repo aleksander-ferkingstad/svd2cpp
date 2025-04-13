@@ -2,6 +2,7 @@
 #include <cstddef>
 #include "delay.hpp"
 
+
 // Register addresses
 constexpr uint32_t RCC_BASE = 0x40023800;
 constexpr uint32_t GPIOB_BASE = 0x40020400;
@@ -24,7 +25,7 @@ struct GPIO_t {
 
 int main() {
     // Enable GPIOB clock
-    RCC->AHB1ENR |= (1 << 1);
+    RCC->AHB1ENR |= 3;
     
     // Configure PB0 as output
     GPIOB->MODER &= ~(3 << 0);

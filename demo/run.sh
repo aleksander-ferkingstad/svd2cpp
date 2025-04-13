@@ -16,7 +16,7 @@ case $1 in
         meson_flags="-Dstrip=true -Doptimization=s -Db_ndebug=true"
         ;;
     size)
-        meson_flags="-Dstrip=false -Doptimization=s -Db_ndebug=true"
+        meson_flags="-Dstrip=false -Doptimization=s -Db_ndebug=false -Ddebug=true"
         ;;
 esac
 

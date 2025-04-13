@@ -2,7 +2,6 @@ project('demo', ['c','cpp'],
   version: '0.2.0',
   default_options: [
     'cpp_std=c++23',
-    'optimization=0',
   ],
 )
 
