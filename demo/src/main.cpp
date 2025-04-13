@@ -1,6 +1,8 @@
 #include <register.hpp>
 #include "delay.hpp"
 
+// Leds are on PB0, PB7 and PB14
+
 constexpr Register<uint32_t, 0x40023830, AccessType::ReadWrite> AHB1ENR;
 
 struct GPIOB_t {
@@ -13,10 +15,15 @@ inline constexpr GPIOB_t GPIOB;
 
 int main() {
     AHB1ENR.bit<1>() = 1;
-    GPIOB.MODER.bits<0,1>() = 0;
-    GPIOB.MODER.bit<0>() = 1;
+    
+    GPIOB.MODER.slice<0,1>() = 1; // set mode for PB0 to output
+    GPIOB.MODER.slice<14,15>() = 1; // set mode for PB7 to output
+    GPIOB.MODER.slice<28,29>() = 1; // Set mode for PB14 to output
+
     while(1) {
         GPIOB.ODR.bit<0>().toggle();
+        GPIOB.ODR.bit<7>().toggle();
+        GPIOB.ODR.bit<14>().toggle();    
         delay<100000>();
     }
 }
