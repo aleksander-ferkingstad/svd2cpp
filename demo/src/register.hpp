@@ -55,6 +55,14 @@ public:
         constexpr void toggle() const requires(access_type == AccessType::ReadWrite) {
             *target ^= (1 << pos);
         }
+
+        constexpr void set() const requires(access_type == AccessType::ReadWrite) {
+            *target |= (1 << pos);
+        }
+
+        constexpr void clear() const requires(access_type == AccessType::ReadWrite) {
+            *target &= ~(1 << pos);
+        }
     };
 
     //! @brief proxy for multiple bits e.g bit<0,1> = 1 would set bit 0 and 1
@@ -74,6 +82,18 @@ public:
     
         constexpr operator reg_type() const requires(access_type != AccessType::WriteOnly) {
             return (*raw_ptr & ((1 << positions) | ...));
+        }
+       
+        constexpr void toggle() const requires(access_type == AccessType::ReadWrite) {
+            *target ^= ((1 << positions) | ...);
+        }
+
+        constexpr void set() const requires(access_type == AccessType::ReadWrite) {
+            *target |= ((1 << positions) | ...);
+        }
+
+        constexpr void clear() const requires(access_type == AccessType::ReadWrite) {
+            *target &= ~((1 << positions) | ...);
         }
     };
 

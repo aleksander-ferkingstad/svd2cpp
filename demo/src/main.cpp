@@ -21,9 +21,7 @@ int main() {
     GPIOB.MODER.slice<28,29>() = 1; // Set mode for PB14 to output
 
     while(1) {
-        GPIOB.ODR.bit<0>().toggle();
-        GPIOB.ODR.bit<7>().toggle();
-        GPIOB.ODR.bit<14>().toggle();    
+        GPIOB.ODR.bits<0,7,14>().toggle();
         delay<100000>();
     }
 }
