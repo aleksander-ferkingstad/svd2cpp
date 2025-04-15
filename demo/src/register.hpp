@@ -5,35 +5,34 @@
 #include <type_traits>
 #include <bit>
 
-enum class AccessType {ReadOnly, WriteOnly, ReadWrite};
+enum class AccessType : uint8_t {ReadOnly, WriteOnly, ReadWrite};
 
 template<typename T>
-concept RegisterType = std::same_as<T, uint8_t> || std::same_as<T, uint16_t> || std::same_as<T, uint32_t> || std::same_as<T, uint64_t>;
+concept RegisterType = std::unsigned_integral<T>;
 
 template<RegisterType reg_type, uintptr_t Address, AccessType access_type=AccessType::ReadWrite>
 class Register {
 public:
     constexpr Register() noexcept = default;
-      
     
     constexpr void operator=(reg_type bit_mask) const requires(access_type != AccessType::ReadOnly) {
-        *raw_ptr = bit_mask;
+        *reinterpret_cast<volatile reg_type*>(Address) = bit_mask;
     }
 
     constexpr operator reg_type() const requires(access_type != AccessType::WriteOnly){
-        return *raw_ptr;
+        return *reinterpret_cast<volatile reg_type*>(Address);
     }
 
     constexpr void operator |= (reg_type bit_mask) const requires(access_type == AccessType::ReadWrite){
-        *raw_ptr |= bit_mask;
+        *reinterpret_cast<volatile reg_type*>(Address) |= bit_mask;
     }
 
     constexpr void operator &= (reg_type bit_mask) const requires(access_type == AccessType::ReadWrite){
-        *raw_ptr &= bit_mask;
+        *reinterpret_cast<volatile reg_type*>(Address) &= bit_mask;
     }
 
     constexpr void operator ^= (reg_type bit_mask) const requires(access_type == AccessType::ReadWrite) {
-        *raw_ptr ^= bit_mask;
+        *reinterpret_cast<volatile reg_type*>(Address) ^= bit_mask;
     } 
 
     //! @brief proxy for individual bits
@@ -81,7 +80,7 @@ public:
         }
     
         constexpr operator reg_type() const requires(access_type != AccessType::WriteOnly) {
-            return (*raw_ptr & ((1 << positions) | ...));
+            return (*reinterpret_cast<volatile reg_type*>(Address) & ((1 << positions) | ...));
         }
        
         constexpr void toggle() const requires(access_type == AccessType::ReadWrite) {
@@ -126,23 +125,21 @@ public:
     template<size_t pos>
     constexpr BitProxy<pos> bit() const {
         static_assert(pos < sizeof(reg_type)*8, "Bit position out of range");
-        return {raw_ptr};
+        return {reinterpret_cast<volatile reg_type*>(Address)};
     }
 
     template<size_t start, size_t end>
     constexpr BitSliceProxy<start, end> slice() const {
         static_assert(start <= end, "Invalid bit range (start > end)");
         static_assert(end < sizeof(reg_type) * 8, "Bit range exceeds register width");
-        return {raw_ptr};
+        return {reinterpret_cast<volatile reg_type*>(Address)};
     }
 
     template<size_t... positions>
     constexpr BitsGroupProxy<positions...> bits() const {
         static_assert(((positions < sizeof(reg_type)*8) && ...), "Bit position out of range");
-        return {raw_ptr};
-    }
-private:
-    static inline volatile reg_type* const raw_ptr = reinterpret_cast<volatile reg_type*>(Address);
+        return {reinterpret_cast<volatile reg_type*>(Address)};
+    }    
 };
 
 
