@@ -1,13 +1,13 @@
 #include <register.hpp>
 #include "delay.hpp"
 
-// Simples solution
+// Simples solution (for reference)
 constexpr uint32_t BASE = 0x40020400;
 constexpr auto AHB1ENR = Register<uint32_t, 0x40023830, AccessType::ReadWrite>();
 constexpr auto MODER = Register<uint32_t, BASE, AccessType::ReadWrite>();
 constexpr auto ODR = Register<uint32_t, BASE+0x14, AccessType::ReadWrite>();
 
-// Structured solution
+//A) Structured solution
 //GPIOB::MODER::MODER1() = 1;
 //GPIOB::MODER::MODER7() = 1;
 //GPIOB::MODER::MODER14() = 1;
@@ -35,7 +35,7 @@ struct GPIOB {
     };
 };
 
-// Inverted logic
+//B) Inverted logic
 // Example: pin<B, 0>::MODER() = 1;
 // Example: pin<B, 0>::ODR().toggle();
 // Inverted logic is nice for GPIO, but how would it work for other peripherals?
@@ -59,9 +59,17 @@ struct pin {
     static constexpr auto ODR() { return ODR_Reg{}.template bit<Pin>(); }
 };
 
+// C) Macro method A different way to acheive similar abstraction as B but using the simpler to generate A system
+// Has limitations since it is not type safe and does not work with variables
+// GPIO_MODER(B, 0) = 1; // works
+// uint8_t_t pin_value = 1;
+// GPIO_MODER(B, pin_value) = 1; // does not work => results in GPIOB::MODER::MODERpin_value
+#define GPIO_MODER(PORT, PIN) GPIO##PORT::MODER::MODER##PIN()
 
 int main() {
     AHB1ENR.bit<1>().set();
+    uint8_t pin_value = 1;
+    GPIO_MODER(B, 1) = 1;
     pin<B, 0>::MODER() = 1;
     GPIOB::MODER::MODER1() = 1;
     GPIOB::MODER::MODER7() = 1;
