@@ -8,9 +8,9 @@ constexpr auto AHB1ENR = Register<uint32_t, 0x40023830, AccessType::ReadWrite>()
 int main() {
     AHB1ENR.bit<1>().set();
 
-    GPIOB::MODER::MODER1() = 0xFF;
-    GPIOB::MODER::MODER7() = 1;
-    GPIOB::MODER::MODER14() = 1;
+    GPIOB::MODER::MODER1().set<1>();
+    GPIOB::MODER::MODER7().set<1>();
+    GPIOB::MODER::MODER14().set<1>();
     
     while(1) {
         GPIOB::ODR::ODR14().toggle();

@@ -42,16 +42,22 @@ public:
         constexpr BitFieldProxy(volatile reg_type* t) : target(const_cast<reg_type*>(t)) {
             static_assert(pos + width <= sizeof(reg_type)*8, "Bit field out of range");
         }
-        constexpr void operator=(reg_type value) const requires(access_type != AccessType::ReadOnly) {
+
+        template<reg_type Value>
+        constexpr void set() const {
+            static_assert(Value <= ((reg_type(1) << width) - 1), 
+                "Value exceeds bit field width");
             constexpr reg_type mask = ((reg_type(1) << width) - 1) << pos;
-            *target = (*target & ~mask) | ((value << pos) & mask);
+            *target = (*target & ~mask) | ((Value << pos) & mask);
         }
+
         constexpr operator reg_type() const requires(access_type != AccessType::WriteOnly) {
             constexpr reg_type mask = ((reg_type(1) << width) - 1) << pos;
             return (*target & mask) >> pos;
         }
         // For single-bit fields, allow bool assignment and conversion
-        constexpr void operator=(bool value) const requires(access_type != AccessType::ReadOnly && width == 1) {
+        
+        constexpr void operator=(bool value) const requires(access_type == AccessType::ReadWrite && width == 1) {
             constexpr reg_type mask = reg_type(1) << pos;
             if (value) *target |= mask;
             else *target &= ~mask;
@@ -83,11 +89,6 @@ public:
         }
         constexpr operator reg_type() const requires(access_type != AccessType::WriteOnly) {
             return (*target & ((reg_type(1) << positions) | ...));
-        }
-        // Optionally: assign a bitmask to set each bit individually
-        constexpr void operator=(reg_type mask_value) const requires(access_type != AccessType::ReadOnly) {
-            constexpr reg_type mask = ((reg_type(1) << positions) | ...);
-            *target = (*target & ~mask) | (mask_value & mask);
         }
         constexpr void toggle() const requires(access_type == AccessType::ReadWrite) {
             *target ^= ((reg_type(1) << positions) | ...);
