@@ -1,10 +1,22 @@
-// Generated with https://github.com/fekral/svd2cpp version {{ converter_version }} with input file {{ input_file }}
+// Generated with https://github.com/fekral/svd2cpp version {{ converter_version }} with input file {{ svd_filename }}
 
 #pragma once
-#include <span>
-#include <type_traits>
-#include <bit>
+#include "register.hpp"
 
 {% for peripheral in peripherals %}
-namespace {{ peripheral.name }}_NS {}
+struct {{ peripheral['name'] }} {
+    static constexpr {{peripheral['size']}} BASE = 0x{{ '%0x' % peripheral['base_address'] }};
+    
+    {% for register in peripheral['registers'] %}
+    struct {{ register['display_name'] }} {
+        static constexpr {{register['size']}} OFFSETT = 0x{{ '%0x' % register['address_offset'] }};
+        using Reg = Register<{{register['size']}}, BASE+OFFSETT, {{ register['access'] }}>;
+
+        {% for field in register['fields'] %}
+        static constexpr auto {{field['name']}}() {return Reg{}.bit<{{field['bit_offset']}}, {{field['bit_width']}}>();}
+        {% endfor %}
+    };
+    
+    {% endfor %}
+};
 {% endfor %}

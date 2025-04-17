@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Force Harmonizer Mk7</title>
+    <style>
+        /* CSS remains the same */
+        body { margin: 0; overflow: hidden; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Orbitron', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        #game-container { position: relative; width: 360px; height: 640px; border: 2px solid #ff80ff; box-shadow: 0 0 25px rgba(255, 128, 255, 0.5); cursor: none; overflow: hidden; }
+        #gameCanvas { display: block; width: 100%; height: 100%; background: linear-gradient(to bottom, #100510, #251025, #100510); }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; box-sizing: border-box; pointer-events: none; text-shadow: 1px 1px 3px #000; color: #ff80ff; z-index: 10; display: flex; justify-content: space-between; align-items: flex-start; }
+        #score, #combo { font-size: 24px; font-weight: bold; background-color: rgba(0, 0, 0, 0.4); padding: 5px 10px; border-radius: 5px; }
+        #combo { color: #ffff00; }
+        .message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; font-size: 32px; font-weight: bold; color: #FFF; background-color: rgba(25, 5, 25, 0.9); padding: 35px; border: 3px solid #ff80ff; border-radius: 15px; text-align: center; box-shadow: 0 0 20px rgba(255, 128, 255, 0.6); z-index: 11; }
+        .message br { margin-bottom: 15px; }
+        #start-message, #game-over-message { display: none; } /* Hidden by default */
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div id="score">Score: 0</div>
+            <div id="combo">Combo: x1</div>
+        </div>
+        <div id="start-message" class="message">FORCE HARMONIZER<br><small style='font-size: 20px;'>Press UP Arrow</small><br><small style='font-size: 14px;'>(UP=Move Up, DOWN=Move Down)</small></div>
+        <!-- Added Game Over Message -->
+        <div id="game-over-message" class="message">GAME OVER<br><small style='font-size: 20px;'>Final Score: <span id="final-score">0</span></small><br><br><small style='font-size: 18px;'>Press UP to Retry</small></div>
+    </div>
+
+    <script>
+        console.log("SCRIPT START: Force Harmonizer Mk7");
+
+        // --- DOM Elements & Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const comboElement = document.getElementById('combo');
+        const startMessage = document.getElementById('start-message');
+        const gameOverMessage = document.getElementById('game-over-message'); // Get Game Over div
+        const finalScoreElement = document.getElementById('final-score'); // Get Final Score span
+
+        const GAME_WIDTH = canvas.clientWidth; const GAME_HEIGHT = canvas.clientHeight;
+        canvas.width = GAME_WIDTH; canvas.height = GAME_HEIGHT;
+
+        // --- Game states & Parameters ---
+        const GameState = { START: 'START', PLAYING: 'PLAYING', GAMEOVER: 'GAMEOVER' };
+        let currentGameState = GameState.START;
+
+        // Player/Calibration Setup
+        const PLAYER_WIDTH = 10; const PLAYER_HEIGHT = 30;
+        const PLAYER_EDGE_X = 0; const CALIBRATION_X = PLAYER_WIDTH;
+        const PLAYER_START_Y = GAME_HEIGHT / 2 - PLAYER_HEIGHT / 2;
+        const PLAYER_MOVEMENT_SPEED = 5.5; // Slightly increased speed
+
+        // Target Setup & Difficulty Scaling
+        const BASE_TARGET_SCROLL_SPEED = 120; const MAX_TARGET_SCROLL_SPEED = 300; // Slightly higher max speed
+        const BASE_TARGET_HEIGHT = 50;
+        const BASE_TARGET_MIN_WIDTH = 250; const BASE_TARGET_MAX_WIDTH = 550;
+        const BASE_MIN_TARGET_GAP_TIME = 1.2; const MIN_TARGET_GAP_TIME_END = 0.5;
+        const DIFFICULTY_RAMP_TIME = 120;
+        const ALTITUDE_DIFFICULTY_FACTOR = 0.5; // *** Increased altitude difficulty impact ***
+
+        // Scoring & Effects
+        const POINTS_PER_ALIGNMENT_TICK = 3; const MAX_COMBO = 10;
+        const COMBO_TOLERANCE_FACTOR = 0.35;
+        const STAR_COUNT = 60; const STAR_SCROLL_SPEED = -30;
+        const PARTICLE_COUNT = 20;
+
+        // --- Game Variables ---
+        let player; let currentTarget = null;
+        let stars = []; let particles = [];
+        let keys = {};
+        let score = 0; let combo = 1; let gameTime = 0;
+        let lastTargetClearTime = -Infinity; let isCurrentlyAligned = false;
+        let isPerfectlyCentered = false; let lastTimestamp = 0;
+        let accumulator = 0; const timeStep = 1 / 60;
+
+        // --- Helper Functions ---
+        function randomBetween(min, max) { return Math.random() * (max - min) + min; }
+        function clamp(value, min, max) { return Math.max(min, Math.min(value, max)); }
+        function lerp(start, end, amount) { return start * (1 - amount) + end * amount; }
+
+        // --- Classes ---
+        class Player { /* ... Player class remains same (direct movement) ... */
+            constructor(x, y, width, height) { this.x = x; this.y = y; this.width = width; this.height = height; this.baseColor = '#ff80ff'; this.comboColor = '#ffff00'; }
+            update(dt) { if (keys['ArrowUp']) { this.y -= PLAYER_MOVEMENT_SPEED; } if (keys['ArrowDown']) { this.y += PLAYER_MOVEMENT_SPEED; } this.y = clamp(this.y, 0, GAME_HEIGHT - this.height); }
+            draw(ctx, isAligned, isCentered) { const currentBaseColor = isCentered ? this.comboColor : this.baseColor; const currentGlowColor = isAligned ? (isCentered ? 'rgba(255, 255, 255, 1.0)' : 'rgba(255, 200, 255, 0.8)') : 'rgba(255, 128, 255, 0.5)'; ctx.shadowColor = currentGlowColor; ctx.shadowBlur = isAligned ? (isCentered ? 25 : 15) : 5; ctx.fillStyle = currentBaseColor; ctx.fillRect(this.x, this.y, this.width, this.height); ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; ctx.fillRect(this.x, this.y - 1, this.width, 1); ctx.fillRect(this.x, this.y + this.height, this.width, 1); }
+            getVerticalBounds() { return { top: this.y, bottom:<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Force Harmonizer Mk7</title>
+    <style>
+        /* CSS remains the same */
+        body { margin: 0; overflow: hidden; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Orbitron', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        #game-container { position: relative; width: 360px; height: 640px; border: 2px solid #ff80ff; box-shadow: 0 0 25px rgba(255, 128, 255, 0.5); cursor: none; overflow: hidden; }
+        #gameCanvas { display: block; width: 100%; height: 100%; background: linear-gradient(to bottom, #100510, #251025, #100510); }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; box-sizing: border-box; pointer-events: none; text-shadow: 1px 1px 3px #000; color: #ff80ff; z-index: 10; display: flex; justify-content: space-between; align-items: flex-start; }
+        #score, #combo { font-size: 24px; font-weight: bold; background-color: rgba(0, 0, 0, 0.4); padding: 5px 10px; border-radius: 5px; }
+        #combo { color: #ffff00; }
+        .message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; font-size: 32px; font-weight: bold; color: #FFF; background-color: rgba(25, 5, 25, 0.9); padding: 35px; border: 3px solid #ff80ff; border-radius: 15px; text-align: center; box-shadow: 0 0 20px rgba(255, 128, 255, 0.6); z-index: 11; }
+        .message br { margin-bottom: 15px; }
+        #start-message, #game-over-message { display: none; } /* Hidden by default */
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div id="score">Score: 0</div>
+            <div id="combo">Combo: x1</div>
+        </div>
+        <div id="start-message" class="message">FORCE HARMONIZER<br><small style='font-size: 20px;'>Press UP Arrow</small><br><small style='font-size: 14px;'>(UP=Move Up, DOWN=Move Down)</small></div>
+        <!-- Added Game Over Message -->
+        <div id="game-over-message" class="message">GAME OVER<br><small style='font-size: 20px;'>Final Score: <span id="final-score">0</span></small><br><br><small style='font-size: 18px;'>Press UP to Retry</small></div>
+    </div>
+
+    <script>
+        console.log("SCRIPT START: Force Harmonizer Mk7");
+
+        // --- DOM Elements & Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const comboElement = document.getElementById('combo');
+        const startMessage = document.getElementById('start-message');
+        const gameOverMessage = document.getElementById('game-over-message'); // Get Game Over div
+        const finalScoreElement = document.getElementById('final-score'); // Get Final Score span
+
+        const GAME_WIDTH = canvas.clientWidth; const GAME_HEIGHT = canvas.clientHeight;
+        canvas.width = GAME_WIDTH; canvas.height = GAME_HEIGHT;
+
+        // --- Game states & Parameters ---
+        const GameState = { START: 'START', PLAYING: 'PLAYING', GAMEOVER: 'GAMEOVER' };
+        let currentGameState = GameState.START;
+
+        // Player/Calibration Setup
+        const PLAYER_WIDTH = 10; const PLAYER_HEIGHT = 30;
+        const PLAYER_EDGE_X = 0; const CALIBRATION_X = PLAYER_WIDTH;
+        const PLAYER_START_Y = GAME_HEIGHT / 2 - PLAYER_HEIGHT / 2;
+        const PLAYER_MOVEMENT_SPEED = 5.5; // Slightly increased speed
+
+        // Target Setup & Difficulty Scaling
+        const BASE_TARGET_SCROLL_SPEED = 120; const MAX_TARGET_SCROLL_SPEED = 300; // Slightly higher max speed
+        const BASE_TARGET_HEIGHT = 50;
+        const BASE_TARGET_MIN_WIDTH = 250; const BASE_TARGET_MAX_WIDTH = 550;
+        const BASE_MIN_TARGET_GAP_TIME = 1.2; const MIN_TARGET_GAP_TIME_END = 0.5;
+        const DIFFICULTY_RAMP_TIME = 120;
+        const ALTITUDE_DIFFICULTY_FACTOR = 0.5; // *** Increased altitude difficulty impact ***
+
+        // Scoring & Effects
+        const POINTS_PER_ALIGNMENT_TICK = 3; const MAX_COMBO = 10;
+        const COMBO_TOLERANCE_FACTOR = 0.35;
+        const STAR_COUNT = 60; const STAR_SCROLL_SPEED = -30;
+        const PARTICLE_COUNT = 20;
+
+        // --- Game Variables ---
+        let player; let currentTarget = null;
+        let stars = []; let particles = [];
+        let keys = {};
+        let score = 0; let combo = 1; let gameTime = 0;
+        let lastTargetClearTime = -Infinity; let isCurrentlyAligned = false;
+        let isPerfectlyCentered = false; let lastTimestamp = 0;
+        let accumulator = 0; const timeStep = 1 / 60;
+
+        // --- Helper Functions ---
+        function randomBetween(min, max) { return Math.random() * (max - min) + min; }
+        function clamp(value, min, max) { return Math.max(min, Math.min(value, max)); }
+        function lerp(start, end, amount) { return start * (1 - amount) + end * amount; }
+
+        // --- Classes ---
+        class Player { /* ... Player class remains same (direct movement) ... */
+            constructor(x, y, width, height) { this.x = x; this.y = y; this.width = width; this.height = height; this.baseColor = '#ff80ff'; this.comboColor = '#ffff00'; }
+            update(dt) { if (keys['ArrowUp']) { this.y -= PLAYER_MOVEMENT_SPEED; } if (keys['ArrowDown']) { this.y += PLAYER_MOVEMENT_SPEED; } this.y = clamp(this.y, 0, GAME_HEIGHT - this.height); }
+            draw(ctx, isAligned, isCentered) { const currentBaseColor = isCentered ? this.comboColor : this.baseColor; const currentGlowColor = isAligned ? (isCentered ? 'rgba(255, 255, 255, 1.0)' : 'rgba(255, 200, 255, 0.8)') : 'rgba(255, 128, 255, 0.5)'; ctx.shadowColor = currentGlowColor; ctx.shadowBlur = isAligned ? (isCentered ? 25 : 15) : 5; ctx.fillStyle = currentBaseColor; ctx.fillRect(this.x, this.y, this.width, this.height); ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; ctx.fillRect(this.x, this.y - 1, this.width, 1); ctx.fillRect(this.x, this.y + this.height, this.width, 1); }
+            getVerticalBounds() { return { top: this.y, bottom: this.y + this.height }; }
+            getCenterY() { return this.y + this.height / 2; }
+        }
+
+        class TargetBar {
+            constructor(yPos, scrollSpeed, targetWidth) {
+                this.width = targetWidth; this.height = BASE_TARGET_HEIGHT; this.x = GAME_WIDTH;
+                this.y = clamp(yPos, this.height * 0.5, GAME_HEIGHT - this.height * 1.5);
+                this.vx = -scrollSpeed; this.color = 'rgba(0, 255, 255, 0.7)'; this.borderColor = '#00ffff';
+                this.comboZoneColor = 'rgba(255, 255, 0, 0.3)';
+                this.passedCalibration = false;
+                this.wasHit = false; // *** Added flag to track if hit ***
+            }
+            update(dt) {
+                this.x += this.vx * dt;
+                // Track if it passed the calibration line *this frame*
+                 const justPassed = !this.passedCalibration && (this.x + this.width < CALIBRATION_X);
+                if (justPassed) {
+                     this.passedCalibration = true;
+                 }
+                 return justPassed; // Return whether it just passed
+            }
+            draw(ctx, isAlignedHere, isCenteredHere) { /* ... Drawing logic remains same ... */
+                ctx.fillStyle = isAlignedHere ? 'rgba(200, 255, 255, 0.9)' : this.color; ctx.fillRect(this.x, this.y, this.width, this.height); const comboZoneHeight = this.height * COMBO_TOLERANCE_FACTOR; const comboZoneY = this.y + (this.height - comboZoneHeight) / 2; ctx.fillStyle = this.comboZoneColor; ctx.fillRect(this.x, comboZoneY, this.width, comboZoneHeight); ctx.strokeStyle = isCenteredHere ? '#ffff00' : this.borderColor; ctx.lineWidth = isCenteredHere ? 4 : (isAlignedHere ? 3 : 2); ctx.strokeRect(this.x, this.y, this.width, this.height);
+            }
+            isOffScreenLeft() { return this.x + this.width < 0; }
+            isOverlappingX(xPos) { return xPos >= this.x && xPos < this.x + this.width; }
+            getVerticalBounds() { return { top: this.y, bottom: this.y + this.height }; }
+            getCenterY() { return this.y + this.height / 2; }
+        }
+
+        class Star { /* ... Star code remains same ... */
+            constructor() { this.x = Math.random() * GAME_WIDTH; this.y = Math.random() * GAME_HEIGHT; this.size = randomBetween(0.5, 1.5); this.opacity = randomBetween(0.2, 0.8); }
+            update(dt) { this.x += STAR_SCROLL_SPEED * dt; if (this.x + this.size < 0) { this.x = GAME_WIDTH + this.size; this.y = Math.random() * GAME_HEIGHT; } }
+            draw(ctx) { ctx.fillStyle = `rgba(255, 180, 255, ${this.opacity})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
+         }
+
+         class Particle { /* ... Particle code remains same ... */
+             constructor(x, y, vx, vy, life, color) { this.x = x; this.y = y; this.vx = vx; this.vy = vy; this.life = life; this.initialLife = life; this.color = color; this.size = randomBetween(1, 4); }
+             update(dt) { this.x += this.vx * dt; this.y += this.vy * dt; this.life -= dt; }
+             draw(ctx) { const alpha = clamp(this.life / (this.initialLife * 0.5), 0, 1); ctx.fillStyle = `rgba(${this.color}, ${alpha})`; ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size); }
+         }
+
+        // --- Game Functions ---
+        function calculateDifficultyValue(base, max, rampTime, currentTime) { const progress = clamp(currentTime / rampTime, 0, 1); return lerp(base, max, progress); }
+        function spawnTarget(currentTime, currentGameTime) { /* ... Spawning logic remains same ... */ if (currentTarget === null && currentTime - lastTargetClearTime >= currentMinGapTime) { const timeDifficultyProgress = clamp(currentGameTime / DIFFICULTY_RAMP_TIME, 0, 1); const currentScrollSpeedBase = lerp(BASE_TARGET_SCROLL_SPEED, MAX_TARGET_SCROLL_SPEED, timeDifficultyProgress); currentMinGapTime = lerp(BASE_MIN_TARGET_GAP_TIME, MIN_TARGET_GAP_TIME_END, timeDifficultyProgress); const currentMinWidth = lerp(BASE_TARGET_MIN_WIDTH, BASE_TARGET_MIN_WIDTH * 0.7, timeDifficultyProgress); const currentMaxWidth = lerp(BASE_TARGET_MAX_WIDTH, BASE_TARGET_MAX_WIDTH * 0.7, timeDifficultyProgress); const targetY = randomBetween(BASE_TARGET_HEIGHT * 0.5, GAME_HEIGHT - BASE_TARGET_HEIGHT * 1.5); const altitudeFactor = clamp(1 - (targetY / (GAME_HEIGHT - BASE_TARGET_HEIGHT * 2)), 0, 1); const altitudeDifficultyMod = altitudeFactor * ALTITUDE_DIFFICULTY_FACTOR; const finalScrollSpeed = currentScrollSpeedBase * (1 + altitudeDifficultyMod); const finalMinWidth = currentMinWidth * (1 - altitudeDifficultyMod * 0.7); /* Make width shrink more drastically */ const finalMaxWidth = currentMaxWidth * (1 - altitudeDifficultyMod * 0.7); const finalTargetWidth = randomBetween(finalMinWidth, finalMaxWidth); currentTarget = new TargetBar(targetY, finalScrollSpeed, finalTargetWidth); } }
+        function checkAlignment(calibrationX) { /* ... Basic check same ... */ if (!player || !currentTarget) return false; if (currentTarget.isOverlappingX(calibrationX)) { const playerBounds = player.getVerticalBounds(); const targetBounds = currentTarget.getVerticalBounds(); return playerBounds.bottom > targetBounds.top && playerBounds.top < targetBounds.bottom; } return false; }
+        function checkComboAlignment(calibrationX) { /* ... Combo check same ... */ if (!player || !currentTarget) return false; if (currentTarget.isOverlappingX(calibrationX)) { const playerCenterY = player.getCenterY(); const targetCenterY = currentTarget.getCenterY(); const tolerance = (currentTarget.height * COMBO_TOLERANCE_FACTOR) / 2; return Math.abs(playerCenterY - targetCenterY) <= tolerance; } return false; }
+        function createParticles(x, y, count, color, speed, directionAngle = null) { /* ... Particle code same ... */ for (let i = 0; i < count; i++) { const angle = directionAngle !== null ? (directionAngle + rand...ARGET_HEIGHT; this.x = GAME_WIDTH;
+                this.y = clamp(yPos, this.height * 0.5, GAME_HEIGHT - this.height * 1.5);
+                this.vx = -scrollSpeed; this.color = 'rgba(0, 255, 255, 0.7)'; this.borderColor = '#00ffff';
+                this.comboZoneColor = 'rgba(255, 255, 0, 0.3)';
+                this.passedCalibration = false;
+                this.wasHit = false; // *** Added flag to track if hit ***
+            }
+            update(dt) {
+                this.x += this.vx * dt;
+                // Track if it passed the calibration line *this frame*
+                 const justPassed = !this.passedCalibration && (this.x + this.width < CALIBRATION_X);
+                if (justPassed) {
+                     this.passedCalibration = true;
+                 }
+                 return justPassed; // Return whether it just passed
+            }
+            draw(ctx, isAlignedHere, isCenteredHere) { /* ... Drawing logic remains same ... */
+                ctx.fillStyle = isAlignedHere ? 'rgba(200, 255, 255, 0.9)' : this.color; ctx.fillRect(this.x, this.y, this.width, this.height); const comboZoneHeight = this.height * COMBO_TOLERANCE_FACTOR; const comboZoneY = this.y + (this.height - comboZoneHeight) / 2; ctx.fillStyle = this.comboZoneColor; ctx.fillRect(this.x, comboZoneY, this.width, comboZoneHeight); ctx.strokeStyle = isCenteredHere ? '#ffff00' : this.borderColor; ctx.lineWidth = isCenteredHere ? 4 : (isAlignedHere ? 3 : 2); ctx.strokeRect(this.x, this.y, this.width, this.height);
+            }
+            isOffScreenLeft() { return this.x + this.width < 0; }
+            isOverlappingX(xPos) { return xPos >= this.x && xPos < this.x + this.width; }
+            getVerticalBounds() { return { top: this.y, bottom: this.y + this.height }; }
+            getCenterY() { return this.y + this.height / 2; }
+        }
+
+        class Star { /* ... Star code remains same ... */
+            constructor() { this.x = Math.random() * GAME_WIDTH; this.y = Math.random() * GAME_HEIGHT; this.size = randomBetween(0.5, 1.5); this.opacity = randomBetween(0.2, 0.8); }
+            update(dt) { this.x += STAR_SCROLL_SPEED * dt; if (this.x + this.size < 0) { this.x = GAME_WIDTH + this.size; this.y = Math.random() * GAME_HEIGHT; } }
+            draw(ctx) { ctx.fillStyle = `rgba(255, 180, 255, ${this.opacity})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
+         }
+
+         class Particle { /* ... Particle code remains same ... */
+             constructor(x, y, vx, vy, life, color) { this.x = x; this.y = y; this.vx = vx; this.vy = vy; this.life = life; this.initialLife = life; this.color = color; this.size = randomBetween(1, 4); }
+             update(dt) { this.x += this.vx * dt; this.y += this.vy * dt; this.life -= dt; }
+             draw(ctx) { const alpha = clamp(this.life / (this.initialLife * 0.5), 0, 1); ctx.fillStyle = `rgba(${this.color}, ${alpha})`; ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size); }
+         }
+
+        // --- Game Functions ---
+        function calculateDifficultyValue(base, max, rampTime, currentTime) { const progress = clamp(currentTime / rampTime, 0, 1); return lerp(base, max, progress); }
+        function spawnTarget(currentTime, currentGameTime) { /* ... Spawning logic remains same ... */ if (currentTarget === null && currentTime - lastTargetClearTime >= currentMinGapTime) { const timeDifficultyProgress = clamp(currentGameTime / DIFFICULTY_RAMP_TIME, 0, 1); const currentScrollSpeedBase = lerp(BASE_TARGET_SCROLL_SPEED, MAX_TARGET_SCROLL_SPEED, timeDifficultyProgress); currentMinGapTime = lerp(BASE_MIN_TARGET_GAP_TIME, MIN_TARGET_GAP_TIME_END, timeDifficultyProgress); const currentMinWidth = lerp(BASE_TARGET_MIN_WIDTH, BASE_TARGET_MIN_WIDTH * 0.7, timeDifficultyProgress); const currentMaxWidth = lerp(BASE_TARGET_MAX_WIDTH, BASE_TARGET_MAX_WIDTH * 0.7, timeDifficultyProgress); const targetY = randomBetween(BASE_TARGET_HEIGHT * 0.5, GAME_HEIGHT - BASE_TARGET_HEIGHT * 1.5); const altitudeFactor = clamp(1 - (targetY / (GAME_HEIGHT - BASE_TARGET_HEIGHT * 2)), 0, 1); const altitudeDifficultyMod = altitudeFactor * ALTITUDE_DIFFICULTY_FACTOR; const finalScrollSpeed = currentScrollSpeedBase * (1 + altitudeDifficultyMod); const finalMinWidth = currentMinWidth * (1 - altitudeDifficultyMod * 0.7); /* Make width shrink more drastically */ const finalMaxWidth = currentMaxWidth * (1 - altitudeDifficultyMod * 0.7); const finalTargetWidth = randomBetween(finalMinWidth, finalMaxWidth); currentTarget = new TargetBar(targetY, finalScrollSpeed, finalTargetWidth); } }
+        function checkAlignment(calibrationX) { /* ... Basic check same ... */ if (!player || !currentTarget) return false; if (currentTarget.isOverlappingX(calibrationX)) { const playerBounds = player.getVerticalBounds(); const targetBounds = currentTarget.getVerticalBounds(); return playerBounds.bottom > targetBounds.top && playerBounds.top < targetBounds.bottom; } return false; }
+        function checkComboAlignment(calibrationX) { /* ... Combo check same ... */ if (!player || !currentTarget) return false; if (currentTarget.isOverlappingX(calibrationX)) { const playerCenterY = player.getCenterY(); const targetCenterY = currentTarget.getCenterY(); const tolerance = (currentTarget.height * COMBO_TOLERANCE_FACTOR) / 2; return Math.abs(playerCenterY - targetCenterY) <= tolerance; } return false; }
+        function createParticles(x, y, count, color, speed, directionAngle = null) { /* ... Particle code same ... */ for (let i = 0; i < count; i++) { const angle = directionAngle !== null ? (directionAngle + rand...
