@@ -1,4 +1,4 @@
-def replace_values(data, target_key, replace_map):
+def replace_values(data, target_key, replace_func):
     """
     Recursively replaces values of `target_key` in nested dicts/lists using `replace_map`.
     
@@ -12,12 +12,12 @@ def replace_values(data, target_key, replace_map):
     """
     if isinstance(data, dict):
         return {
-            k: replace_values(v, target_key, replace_map) if k != target_key 
-            else replace_map.get(v, v)  # Replace only if key matches
+            k: replace_values(v, target_key, replace_func) if k != target_key 
+            else replace_func(v)  # Replace only if key matches
             for k, v in data.items()
         }
     elif isinstance(data, list):
-        return [replace_values(item, target_key, replace_map) for item in data]
+        return [replace_values(item, target_key, replace_func) for item in data]
     else:
         return data
     
