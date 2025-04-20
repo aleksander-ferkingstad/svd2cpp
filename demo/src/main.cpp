@@ -1,22 +1,19 @@
-#include <register.hpp>
+#include "../generated/STM32F7x7_pac.hpp"
 #include "delay.hpp"
 
-constexpr Register<uint32_t, 0x40023830, AccessType::ReadWrite> AHB1ENR;
-
-struct GPIOB_t {
-    static constexpr uint32_t BASE = 0x40020400;
-    static constexpr auto MODER = Register<uint32_t, BASE, AccessType::ReadWrite>();
-    static constexpr auto ODR = Register<uint32_t, BASE+0x14, AccessType::ReadWrite>();
-};
-
-inline constexpr GPIOB_t GPIOB;
+// Simples solution (for reference)
+constexpr uint32_t BASE = 0x40020400;
+constexpr auto AHB1ENR = Register<uint32_t, 0x40023830, AccessType::ReadWrite>();
 
 int main() {
-    AHB1ENR.bit<1>() = 1;
-    GPIOB.MODER.bits<0,1>() = 0;
-    GPIOB.MODER.bit<0>() = 1;
+    AHB1ENR.bit<1>().set();
+
+    GPIOB::MODER::MODER1().set<static_cast<uint8_t>(GPIOB::MODER::MODER0::Output)>();
+    GPIOB::MODER::MODER7().set<1>();
+    GPIOB::MODER::MODER14().set<1>();
+    
     while(1) {
-        GPIOB.ODR ^= 1;
+        GPIOB::ODR::ODR14().toggle();
         delay<100000>();
     }
 }
