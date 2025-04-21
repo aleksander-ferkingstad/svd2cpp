@@ -1,40 +1,31 @@
-use svd_parser as svd;
+use std::fs;
 use std::env::args;
-use std::fs::File;
-use std::io::Read;
-use std::path::PathBuf;
-use std::io::Write;  // Add this import
 
-fn main() {
-    let mut args = args();
-    let svd_fn = if let (Some(_), Some(arg1), None) = (args.next(), args.next(), args.next()) {
-        PathBuf::from(arg1)
-    } else {
-        println!("Usage: (svd2json) file.svd");
-        return;
-    };
+mod generator;
+mod svd_file;
 
-    let mut svd_xml = String::new();
-    File::open(&svd_fn)
-        .expect("Failed to open SVD input file")
-        .read_to_string(&mut svd_xml)
-        .expect("Failed to read SVD input file to a String");
+fn main() -> Result<(), Box<dyn std::error::Error>> {
 
-    let device = svd::parse(&mut svd_xml).expect("Failed to parse the SVD file into Rust structs");
-
-    // Convert to JSON
-    let json = serde_json::to_string_pretty(&device)
-        .expect("Failed to serialize device to JSON");
-        
-    // Create output filename
-    let mut json_fn = svd_fn.clone();
-    json_fn.set_extension("json");
+    let args: Vec<String> = args().collect();
+    if args.len() < 2 {
+        eprintln!("Usage: {} <input_file>", args[0]);
+        std::process::exit(1);
+    }
     
-    // Write to file
-    let mut file = File::create(&json_fn)
-        .expect("Failed to create output JSON file");
-    file.write_all(json.as_bytes())
-        .expect("Failed to write JSON to file");
+    if fs::metadata("generated").is_ok() {
+        fs::remove_dir_all("generated")?;
+    }
+
+    fs::create_dir("generated")?;
+    fs::create_dir("generated/headers")?;
+    fs::copy("src/register.hpp", "generated/headers/register.hpp")?;
+
     
-    println!("Successfully converted to {}", json_fn.display());
+    let device = svd_file::parse_svd_file(&args[1])?;
+    let json_file = format!("generated/{}.json", device.name.clone());
+    svd_file::svd_device_to_json_file(&device, &json_file)?;
+
+    generator::generate_pac(&device, "generated/headers")?;
+    
+    return Ok(());
 }
