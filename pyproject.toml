@@ -5,17 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "cmsis-svd>=0.6",
     "jinja2>=3.1.6",
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-=======
-    "pytest>=8.3.5",
-    "svdsuite>=0.2.2",
-    "xmltodict>=0.14.2",
->>>>>>> Stashed changes
-=======
     "pytest>=8.3.5",
     "xmltodict>=0.14.2",
->>>>>>> ca47150656380743bedf50fe179b6bd8cad0129e
 ]
