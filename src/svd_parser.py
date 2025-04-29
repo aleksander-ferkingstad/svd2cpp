@@ -1,6 +1,8 @@
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional
 from typing import Tuple
+import xml_helper
+import json
 
 def cleanup_text_fields(element: ET.Element) -> None:
     ''' Removes \n and trailing spaces from text fields in the XML element tree. '''
@@ -68,7 +70,24 @@ def resolve_inheritance(root : ET.Element, lookups ):
     # Loop through all peripherals and resolve inheritance
     for peripheral in root.findall('./peripherals/peripheral'):
         resolve_element_inheritance(peripheral, lut_peripherals)
-        
+
+def resolve_enumerated_values(root : ET.Element) -> None:
+    for register in root.findall('./peripherals/peripheral/registers/register'):
+        register.append(ET.Element('enums'))
+        for field in register.findall('fields/field'):
+            for enum_values in field.findall('enumeratedValues'):
+                name = enum_values.findtext('name')
+                if name is None:
+                    name = enum_values.get('derivedFrom')
+                
+                # create a element called enumName
+                enum_name = ET.Element('enumName')
+                enum_name.text = name
+                field.append(enum_name)
+
+                register.find('enums').append(enum_values)
+                field.remove(enum_values)
+
 def parse_svd_file(svd_file: str) :
     peripherals = []
     tree = ET.parse(svd_file)
@@ -76,8 +95,11 @@ def parse_svd_file(svd_file: str) :
     cleanup_text_fields(root)
     lookups = build_lookup_tables(root)
     resolve_inheritance(root, lookups)
-
+    resolve_enumerated_values(root)
     # Save resolved result to file
     tree.write('svd/resolved_svd.xml', encoding='utf-8', xml_declaration=True)
+
+    xml_helper.xml_to_json_file('svd/resolved_svd.xml')
+
     
     return peripherals
