@@ -4,33 +4,8 @@
 #include "register.hpp"
 
 {% for peripheral in peripherals %}
-//! @brief {{ peripheral['description'] }}. Part of the {{ peripheral['groupName'] }} group.
-struct {{ peripheral['name'] }} {
-    static constexpr {{register_width}} BASE = {{ peripheral['baseAddress'] }};
-    {% for register in peripheral['registers']['register'] %}
-    {#if interrupts...#}
-    //! @brief {{ register['description'] }}
-    struct {{ register['name']}} {
-        static constexpr {{register['size']}} ADDRESS = BASE + {{register['addressOffset']}};
-        static constexpr {{register['size']}} RESET_VALUE = {{ register['resetValue'] }};
-        using Reg = Register<{{register['size']}}, ADDRESS, {{ register['access'] }}>;
-        
-        {% for enum in register['enums'] %}
-        enum class {{ enum['name'] }} {
-            {% for value in enum['enumeratedValue'] %}
-            {{ value['name'] }} = {{ value['value'] }}, // {{value['description']}}
-            {% endfor %}
-        };
-        {% endfor %}
-        
-        {% for field in register['fields']['field'] %}
-        {#if enum#}
-        {#if writeConstraint#}
-        {#else#}
-        static constexpr auto {{field['name']}}() {return Reg{}.bit<{{field['bitOffset']}}, {{field['bitWidth']}}>();} // {{field['enumeratedValues']}}
-        {% endfor %}
-    };
-
-    {% endfor %}
+//! @brief {{ peripheral.findtext('description') }}
+struct {{ peripheral.findtext('name')}} {
+    static constexpr {{register_width}} BASE = {{ peripheral.findtext('baseAddress') }};
 };
 {% endfor %}

@@ -222,10 +222,7 @@ def _resolve_clusters_in_registers(registers_elem, base_offset=0):
                             registers_elem.append(reg)
                 registers_elem.remove(child)
 
-def parse_svd_file(svd_file: str, debug = False) :
-    peripherals = []
-    tree = ET.parse(svd_file)
-    root = tree.getroot()
+def flatten_svd_file(root, debug = False) :
     cleanup_text_fields(root)
     resolve_clusters(root)
     lookups = build_lookup_tables(root)
@@ -233,6 +230,6 @@ def parse_svd_file(svd_file: str, debug = False) :
     resolve_enumerated_values(root)
     if debug:
         print("Resolved svd stored in svd/resolved_svd.xml and svd/resolved_svd.json")
+        tree = ET.ElementTree(root)
         tree.write('svd/resolved_svd.xml', encoding='utf-8', xml_declaration=True)
         xml_helper.xml_to_json_file('svd/resolved_svd.xml')
-    return peripherals
